@@ -10,14 +10,13 @@
 
 #define BUFFLEN 2048
 
-void handleErrors(void)
-{
+void handleErrors(void) {
     ERR_print_errors_fp(stderr);
     abort();
 }
 
 int encrypt(const unsigned char *plaintext, int plaintext_len, const unsigned char *key,
-                const unsigned char *iv, unsigned char *ciphertext) {
+            const unsigned char *iv, unsigned char *ciphertext) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) handleErrors();
 
@@ -40,7 +39,7 @@ int encrypt(const unsigned char *plaintext, int plaintext_len, const unsigned ch
 }
 
 int decrypt(const unsigned char *ciphertext, int ciphertext_len, const unsigned char *key,
-                const unsigned char *iv, unsigned char *plaintext) {
+            const unsigned char *iv, unsigned char *plaintext) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) handleErrors();
 
@@ -62,61 +61,80 @@ int decrypt(const unsigned char *ciphertext, int ciphertext_len, const unsigned 
     return plaintext_len;
 }
 
-int main(int argc, char *argv[])
-{
-  int opt;
-  char *key = NULL;
-  char *vector = NULL;
-  char *filename = NULL;
-  bool decrypt = 0;
-  
-  while ((opt = getopt(argc, argv, "k:v:f:d")) != -1) {
-    switch (opt) {
-      case 'k':
-        key = optarg;
-        break;
-      case 'v':
-        vector = optarg;
-        break;
-      case 'f':
-        filename = optarg;
-        break;
-      case 'd':
-        decrypt = 0;
-        break;
-      case '?':
-        fprintf(stderr, "Unknown option: %c\n", optopt);
+int main(int argc, char *argv[]) {
+    int opt;
+    char *key = NULL;
+    char *vector = NULL;
+    char *filename = NULL;
+    bool is_decrypt = false;
+
+    while ((opt = getopt(argc, argv, "k:v:f:d")) != -1) {
+        switch (opt) {
+            case 'k':
+                key = optarg;
+                break;
+            case 'v':
+                vector = optarg;
+                break;
+            case 'f':
+                filename = optarg;
+                break;
+            case 'd':
+                is_decrypt = true;
+                break;
+            case '?':
+                fprintf(stderr, "Unknown option: %c\n", optopt);
+                exit(1);
+        }
+    }
+
+    if (key == NULL || vector == NULL) {
+        fprintf(stderr, "Usage: %s -k key -v vector [-f file] [string]\n", argv[0]);
         exit(1);
     }
-  }
-  
-  if (key == NULL || vector == NULL) {
-    fprintf(stderr, "Usage: $s -k key -v vector [-f file] [string]\n", argv[0]);
-    exit(1);
-  }
-
-  char buff[BUFFLEN+1];
-  int text_len;
-  
-  if (filename) {
-    FILE *file = fopen(filename, "r");
-    if (file == NULL) {
-      fprintf(stderr, "Error opening file\n");
-      exit(1);
+    if (strlen(key) != 16 || strlen(vector) != 16) {
+        fprintf(stderr, "Error: Key and vector must be 128 bits\n");
+        exit(1);
     }
-    text_len = fread(buff, 1, BUFFLEN, file);
-    fclose(file);
-    buff[text_len] = '\0';
-  }
-  else if (optind < argc) {
-    strncpy(buff, argv[optind], BUFFLEN - 1);
-    text_len = strlen(buff);
-  }
-  else {
-    text_len = fread(buff, 1, BUFFLEN, stdin);
-    buff[text_len] = '\0';
-  }
-  printf("%s", buff);
 
-  return 0;
+    char buff[BUFFLEN+1];
+    int text_len;
+
+    if (filename) {
+        FILE *file = fopen(filename, "r");
+        if (file == NULL) {
+            fprintf(stderr, "Error opening file\n");
+            exit(1);
+        }
+        text_len = fread(buff, 1, BUFFLEN, file);
+        fclose(file);
+        buff[text_len] = '\0';
+    }
+    else if (optind < argc) {
+        strncpy(buff, argv[optind], BUFFLEN - 1);
+        buff[BUFFLEN - 1] = '\0';
+        text_len = strlen(buff);
+    }
+    else {
+        text_len = fread(buff, 1, BUFFLEN, stdin);
+        buff[text_len] = '\0';
+    }
+
+    unsigned char *k = (unsigned char *) key;
+    unsigned char *v = (unsigned char *) vector;
+    unsigned char outtext[BUFFLEN];
+    int outtext_len;
+
+    if (is_decrypt) {
+        unsigned char *ciphertext = (unsigned char *) buff;
+        outtext_len = decrypt(ciphertext, text_len, k, v, outtext);
+    } else {
+        unsigned char *plaintext = (unsigned char *) buff;
+        outtext_len = encrypt(plaintext, text_len, k, v, outtext);
+    }
+
+    outtext[outtext_len] = '\0';
+    printf("%s", outtext);
+
+    return 0;
 }
