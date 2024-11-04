@@ -95,29 +95,28 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
+  char buff[BUFFLEN+1];
+  int text_len;
+  
   if (filename) {
     FILE *file = fopen(filename, "r");
-    char buff[BUFFLEN];
     if (file == NULL) {
       fprintf(stderr, "Error opening file\n");
       exit(1);
     }
-    while (fgets(buff, sizeof(buff), file)) {
-      printf("%s", buff);
-    }
+    text_len = fread(buff, 1, BUFFLEN, file);
+    fclose(file);
+    buff[text_len] = '\0';
   }
   else if (optind < argc) {
-    char *string_arg = argv[optind];
-    printf("%s\n", string_arg);
+    strncpy(buff, argv[optind], BUFFLEN - 1);
+    text_len = strlen(buff);
   }
   else {
-    char buff[BUFFLEN];
-    while (fgets(buff, sizeof(buff), stdin)) {
-      printf("%s", buff);
-    }
-  } else {
-    printf("Error: no input text was provided\n");
+    text_len = fread(buff, 1, BUFFLEN, stdin);
+    buff[text_len] = '\0';
   }
+  printf("%s", buff);
 
   return 0;
 }
